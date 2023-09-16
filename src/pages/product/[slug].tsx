@@ -1,17 +1,19 @@
 import {
-  type GetStaticProps,
   type GetStaticPaths,
+  type GetStaticProps,
   type InferGetStaticPropsType,
 } from "next";
 import { useRouter } from "next/router";
-import { sleep } from "~/lib/utils";
+
+import { getProductBySlug, getProductSlugs } from "~/lib/commercetools";
+import type { NormalisedProduct } from "~/lib/commercetools/types";
 
 type ProductPageProps = {
-  slug: string;
+  product: NormalisedProduct;
 };
 
 export const getStaticPaths = (async () => {
-  const slugs = ["1", "2", "3"];
+  const slugs = await getProductSlugs({ limit: 16 });
 
   const paths = slugs.map((slug) => {
     return {
@@ -32,17 +34,23 @@ export const getStaticProps = (async (context) => {
     ? context.params?.["slug"][0]
     : context.params?.["slug"];
 
-  if (!slug || slug.includes("invalid")) {
+  if (!slug) {
     return {
       notFound: true,
     };
   }
 
-  await sleep(2000);
+  const product = await getProductBySlug(slug);
+
+  if (!product) {
+    return {
+      notFound: true,
+    };
+  }
 
   return {
     props: {
-      slug,
+      product,
     },
   };
 }) satisfies GetStaticProps<ProductPageProps>;
@@ -60,11 +68,16 @@ export default function ProductPage(
     );
   }
 
-  const { slug } = props;
+  const { product } = props;
 
   return (
     <div>
-      <h1>Product {slug}</h1>
+      <h1>{product.name}</h1>
+      <section className="max-w-5xl overflow-x-scroll">
+        <pre>
+          <code>{JSON.stringify(product, null, 2)}</code>
+        </pre>
+      </section>
     </div>
   );
 }
