@@ -1,6 +1,6 @@
 import { type GetStaticProps, type InferGetStaticPropsType } from "next";
-import Link from "next/link";
 
+import { ProductCard } from "~/components";
 import { getProducts } from "~/lib/commercetools";
 import type { NormalisedProduct } from "~/lib/commercetools/types";
 
@@ -29,15 +29,8 @@ export default function Home(
         <h2>All products</h2>
         <ol className="m-0 grid list-none grid-cols-5 gap-2 p-0 xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2 sm:grid-cols-1">
           {products.map((product) => (
-            <li
-              key={product.id}
-              className="flex h-24 flex-col justify-between border border-solid p-2"
-            >
-              <Link href={product.path}>{product.name}</Link>
-              <div className="flex flex-row-reverse gap-x-2">
-                <button>Add to cart</button>
-                <button>Add to wishlist</button>
-              </div>
+            <li key={product.id}>
+              <ProductCard product={product} />
             </li>
           ))}
         </ol>

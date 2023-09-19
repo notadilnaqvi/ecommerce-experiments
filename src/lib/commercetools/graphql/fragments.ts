@@ -23,9 +23,7 @@ const CART_FRAGMENT = getTypedDocumentNode(/* GraphQL */ `
       name(locale: $locale)
       quantity
       totalPrice {
-        centAmount
-        currencyCode
-        fractionDigits
+        ...MoneyFragment
       }
       productSlug(locale: $locale)
       variant {
@@ -37,9 +35,7 @@ const CART_FRAGMENT = getTypedDocumentNode(/* GraphQL */ `
       }
     }
     totalPrice {
-      centAmount
-      currencyCode
-      fractionDigits
+      ...MoneyFragment
     }
   }
 `);
@@ -98,5 +94,13 @@ const PRODUCT_PROJECTION_FRAGMENT = getTypedDocumentNode(/* GraphQL */ `
         country
       }
     }
+  }
+`);
+
+const MONEY_FRAGMENT = getTypedDocumentNode(/* GraphQL */ `
+  fragment MoneyFragment on Money {
+    centAmount
+    currencyCode
+    fractionDigits
   }
 `);

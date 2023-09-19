@@ -1,269 +1,267 @@
-import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from "@apollo/client";
 
-import { generateCustomerAuthToken } from '~/lib/commercetools/auth';
+import { generateCustomerAuthToken } from "~/lib/commercetools/auth";
 import {
-	CREATE_CART,
-	CUSTOMER_LOGIN,
-	CUSTOMER_SIGN_UP,
-	UPDATE_CART,
-} from '~/lib/commercetools/graphql/mutations';
-import { GET_CART, GET_CUSTOMER } from '~/lib/commercetools/graphql/queries';
+  CREATE_CART,
+  CUSTOMER_LOGIN,
+  CUSTOMER_SIGN_UP,
+  UPDATE_CART,
+} from "~/lib/commercetools/graphql/mutations";
+import { GET_CART, GET_CUSTOMER } from "~/lib/commercetools/graphql/queries";
 import {
-	normaliseCart,
-	normaliseCustomer,
-} from '~/lib/commercetools/normalisation';
+  normaliseCart,
+  normaliseCustomer,
+} from "~/lib/commercetools/normalisation";
 import {
-	AnonymousCartSignInMode,
-	UpdateCartMutationVariables,
-} from '~/lib/commercetools/types';
-import { Cookie } from '~/lib/utils/cookie';
+  AnonymousCartSignInMode,
+  UpdateCartMutationVariables,
+} from "~/lib/commercetools/types";
 import {
-	AUTH_TOKEN_VALIDITY_DAYS,
-	COUNTRY,
-	CURRENCY_CODE,
-	LOCALE,
-} from '~/lib/utils/constants';
+  AUTH_TOKEN_VALIDITY_DAYS,
+  COUNTRY,
+  CURRENCY_CODE,
+  LOCALE,
+} from "~/lib/utils/constants";
+import { Cookie } from "~/lib/utils/cookie";
 
 type UpdateLineItemQuantityProps = {
-	lineItemId: string;
-	quantity: number;
+  lineItemId: string;
+  quantity: number;
 };
 
 type RemoveLineItemProps = {
-	lineItemId: string;
+  lineItemId: string;
 };
 
 type SignUpProps = {
-	email: string;
-	password: string;
-	firstName: string;
-	lastName: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
 };
 
 type LoginProps = {
-	email: string;
-	password: string;
+  email: string;
+  password: string;
 };
 
 export function useAddToCart() {
-	const [updateCart, { data, loading, error }] = useUpdateCart();
+  const [updateCart, { data, loading, error }] = useUpdateCart();
 
-	async function addToCart(props: { sku: string }) {
-		const { sku } = props;
+  async function addToCart(props: { sku: string }) {
+    const { sku } = props;
 
-		await updateCart({
-			actions: [{ addLineItem: { sku, quantity: 1 } }],
-		});
-	}
+    console.log("[debug] addToCart", sku);
+    await updateCart({
+      actions: [{ addLineItem: { sku, quantity: 1 } }],
+    });
+  }
 
-	return [addToCart, { data, loading, error }] as const;
+  return [addToCart, { data, loading, error }] as const;
 }
 
 export function useCreateCart() {
-	const [mutate, { data, loading, error }] = useMutation(CREATE_CART, {
-		variables: {
-			locale: LOCALE,
-			draft: {
-				currency: CURRENCY_CODE,
-				country: COUNTRY,
-				locale: LOCALE,
-			},
-		},
-	});
+  const [mutate, { data, loading, error }] = useMutation(CREATE_CART, {
+    variables: {
+      locale: LOCALE,
+      draft: {
+        currency: CURRENCY_CODE,
+        country: COUNTRY,
+        locale: LOCALE,
+      },
+    },
+  });
 
-	async function createCart() {
-		const result = await mutate({
-			update: (cache, { data }) => {
-				cache.writeQuery({
-					query: GET_CART,
-					data: {
-						me: {
-							cart: data?.cart,
-						},
-					},
-				});
-			},
-		});
-		return result;
-	}
+  async function createCart() {
+    const result = await mutate({
+      update: (cache, { data }) => {
+        cache.writeQuery({
+          query: GET_CART,
+          data: {
+            me: {
+              cart: data?.cart,
+            },
+          },
+        });
+      },
+    });
+    return result;
+  }
 
-	return [createCart, { data, loading, error }] as const;
+  return [createCart, { data, loading, error }] as const;
 }
 
 export function useCart() {
-	const { data, loading, error, refetch } = useQuery(GET_CART, {
-		variables: { locale: LOCALE },
-	});
+  const { data, loading, error, refetch } = useQuery(GET_CART, {
+    variables: { locale: LOCALE },
+  });
 
-	return {
-		data: normaliseCart(data?.me.cart),
-		loading,
-		error,
-		refetch,
-	};
+  return {
+    data: normaliseCart(data?.me.cart),
+    loading,
+    error,
+    refetch,
+  };
 }
 
 export function useUpdateCart() {
-	const { data: cart, loading: cartLoading } = useCart();
-	const [createCart, { loading: createCartLoading }] = useCreateCart();
-	const [mutate, { data, loading: updateCartLoading, error }] =
-		useMutation(UPDATE_CART);
+  const { data: cart, loading: cartLoading } = useCart();
+  const [createCart, { loading: createCartLoading }] = useCreateCart();
+  const [mutate, { data, loading: updateCartLoading, error }] =
+    useMutation(UPDATE_CART);
 
-	async function updateCart(
-		props: Pick<UpdateCartMutationVariables, 'actions'>,
-	) {
-		const { actions } = props;
+  async function updateCart(
+    props: Pick<UpdateCartMutationVariables, "actions">,
+  ) {
+    const { actions } = props;
 
-		let id = cart?.id;
-		let version = cart?.version;
+    let id = cart?.id;
+    let version = cart?.version;
 
-		if (!id || !version) {
-			const { data: createCartData } = await createCart();
-			id = createCartData?.cart?.id;
-			version = createCartData?.cart?.version;
-		}
+    if (!id || !version) {
+      const { data: createCartData } = await createCart();
+      id = createCartData?.cart?.id;
+      version = createCartData?.cart?.version;
+    }
 
-		if (!id || !version) {
-			throw new Error('[updateCart]: No cart found to update');
-		}
+    if (!id || !version) {
+      throw new Error("[updateCart]: No cart found to update");
+    }
 
-		await mutate({
-			variables: { id, version, actions, locale: LOCALE },
-		});
-	}
+    await mutate({
+      variables: { id, version, actions, locale: LOCALE },
+    });
+  }
 
-	return [
-		updateCart,
-		{
-			data,
-			// Using the `loading` property from the `useMutation` hook is not enough
-			// because it not be `true` until we call the `mutate` function. Meaning
-			// that we can't use it to show a loading state while we're waiting for
-			// the cart to be fetched or `createCart` mutation to finish. Instead,
-			// we say that `updateCart` is loading if any of the three operations
-			// (useCart, useCreateCart, useMutation) are loading.
-			loading: cartLoading || createCartLoading || updateCartLoading,
-			error,
-		},
-	] as const;
+  return [
+    updateCart,
+    {
+      data,
+      // Using the `loading` property from the `useMutation` hook is not enough
+      // because it not be `true` until we call the `mutate` function. Meaning
+      // that we can't use it to show a loading state while we're waiting for
+      // the cart to be fetched or `createCart` mutation to finish. Instead,
+      // we say that `updateCart` is loading if any of the three operations
+      // (useCart, useCreateCart, useMutation) are loading.
+      loading: cartLoading || createCartLoading || updateCartLoading,
+      error,
+    },
+  ] as const;
 }
 
 export function useUpdateLineItemQuantity() {
-	const [updateCart, { data, loading }] = useUpdateCart();
+  const [updateCart, { data, loading }] = useUpdateCart();
 
-	async function updateLineItemQuantity(props: UpdateLineItemQuantityProps) {
-		const { lineItemId, quantity } = props;
+  async function updateLineItemQuantity(props: UpdateLineItemQuantityProps) {
+    const { lineItemId, quantity } = props;
 
-		await updateCart({
-			actions: [{ changeLineItemQuantity: { lineItemId, quantity } }],
-		});
-	}
+    await updateCart({
+      actions: [{ changeLineItemQuantity: { lineItemId, quantity } }],
+    });
+  }
 
-	return [updateLineItemQuantity, { data, loading }] as const;
+  return [updateLineItemQuantity, { data, loading }] as const;
 }
 
-export function useRemoveLineItem() {
-	const [updateCart, { data, loading }] = useUpdateCart();
+export function useRemoveFromCart() {
+  const [updateCart, { data, loading }] = useUpdateCart();
 
-	async function removeLineItem(props: RemoveLineItemProps) {
-		const { lineItemId } = props;
+  async function removeLineItem(props: RemoveLineItemProps) {
+    const { lineItemId } = props;
 
-		await updateCart({
-			actions: [{ removeLineItem: { lineItemId } }],
-		});
-	}
+    await updateCart({
+      actions: [{ removeLineItem: { lineItemId } }],
+    });
+  }
 
-	return [removeLineItem, { data, loading }] as const;
+  return [removeLineItem, { data, loading }] as const;
 }
 
 export function useCustomer() {
-	const authToken = Cookie.get('auth_token');
-	const { data, loading, error } = useQuery(GET_CUSTOMER, {
-		skip: !authToken?.is_logged_in, // Don't run this query if the user isn't logged in
-	});
-	return {
-		data: normaliseCustomer(data?.me.customer),
-		loading,
-		error,
-	};
+  const { data, loading, error } = useQuery(GET_CUSTOMER);
+  return {
+    data: normaliseCustomer(data?.me.customer),
+    loading,
+    error,
+  };
 }
 
 export function useLogin() {
-	const [mutate, { data, loading, error }] = useMutation(CUSTOMER_LOGIN);
+  const [mutate, { data, loading, error }] = useMutation(CUSTOMER_LOGIN);
 
-	async function login(props: LoginProps) {
-		const { email, password } = props;
+  async function login(props: LoginProps) {
+    const { email, password } = props;
 
-		await mutate({
-			variables: {
-				draft: {
-					email,
-					password,
-					activeCartSignInMode:
-						AnonymousCartSignInMode.UseAsNewActiveCustomerCart,
-				},
-			},
-		});
+    await mutate({
+      variables: {
+        draft: {
+          email,
+          password,
+          activeCartSignInMode:
+            AnonymousCartSignInMode.UseAsNewActiveCustomerCart,
+        },
+      },
+    });
 
-		if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-		const authToken = await generateCustomerAuthToken({
-			email,
-			password,
-		});
+    const authToken = await generateCustomerAuthToken({
+      email,
+      password,
+    });
 
-		Cookie.set('auth_token', authToken, {
-			expires: AUTH_TOKEN_VALIDITY_DAYS,
-		});
-	}
+    Cookie.set("auth_token", authToken, {
+      expires: AUTH_TOKEN_VALIDITY_DAYS,
+    });
+  }
 
-	return [
-		login,
-		{
-			data: normaliseCustomer(data?.customerSignMeIn.customer),
-			loading,
-			error,
-		},
-	] as const;
+  return [
+    login,
+    {
+      data: normaliseCustomer(data?.customerSignMeIn.customer),
+      loading,
+      error,
+    },
+  ] as const;
 }
 
 export function useSignUp() {
-	const [mutate, { data, loading, error }] = useMutation(CUSTOMER_SIGN_UP);
+  const [mutate, { data, loading, error }] = useMutation(CUSTOMER_SIGN_UP);
 
-	async function signUp(props: SignUpProps) {
-		const { email, firstName, lastName, password } = props;
+  async function signUp(props: SignUpProps) {
+    const { email, firstName, lastName, password } = props;
 
-		await mutate({
-			variables: { draft: { email, firstName, lastName, password } },
-		});
+    await mutate({
+      variables: { draft: { email, firstName, lastName, password } },
+    });
 
-		if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-		const authToken = await generateCustomerAuthToken({
-			email,
-			password,
-		});
+    const authToken = await generateCustomerAuthToken({
+      email,
+      password,
+    });
 
-		Cookie.set('auth_token', authToken, {
-			expires: AUTH_TOKEN_VALIDITY_DAYS,
-		});
-	}
+    Cookie.set("auth_token", authToken, {
+      expires: AUTH_TOKEN_VALIDITY_DAYS,
+    });
+  }
 
-	return [
-		signUp,
-		{
-			data: normaliseCustomer(data?.customerSignMeUp.customer),
-			loading,
-			error,
-		},
-	] as const;
+  return [
+    signUp,
+    {
+      data: normaliseCustomer(data?.customerSignMeUp.customer),
+      loading,
+      error,
+    },
+  ] as const;
 }
 
 export function useLogout() {
-	const apolloClient = useApolloClient();
-	async function logout() {
-		Cookie.remove('auth_token');
-		await apolloClient.resetStore();
-	}
-	return [logout] as const;
+  const apolloClient = useApolloClient();
+  async function logout() {
+    await apolloClient.resetStore();
+    Cookie.remove("auth_token");
+  }
+  return [logout] as const;
 }

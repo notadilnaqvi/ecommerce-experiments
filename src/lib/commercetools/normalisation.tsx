@@ -1,11 +1,13 @@
 import type {
   CartFragmentFragment,
   CustomerFragmentFragment,
+  MoneyFragmentFragment,
   NormalisedCart,
   NormalisedCustomer,
   NormalisedProduct,
   ProductProjectionFragmentFragment,
 } from "~/lib/commercetools/types";
+import { LOCALE } from "~/lib/utils/constants";
 
 export function normaliseProduct(
   product?: Maybe<ProductProjectionFragmentFragment>,
@@ -42,11 +44,9 @@ export function normaliseProduct(
     return null;
   }
 
-	if (!product.slug) {
+  if (!product.slug) {
     console.warn(
-      "[normaliseProduct]: Product with ID " +
-        product.id +
-        " has no slug.",
+      "[normaliseProduct]: Product with ID " + product.id + " has no slug.",
     );
     return null;
   }
@@ -61,12 +61,16 @@ export function normaliseProduct(
   return {
     id: product.id,
     sku: sku,
-    path: '/product/' + product.slug,
+    path: "/product/" + product.slug,
     images: images,
     description: product.description,
     name: name,
     slug: product.slug,
-    price: { centAmount, currencyCode, fractionDigits },
+    price: normalisePrice({
+      centAmount,
+      currencyCode,
+      fractionDigits,
+    }),
   };
 }
 
@@ -97,7 +101,7 @@ export function normaliseCart(
     id: cart.id,
     version: cart.version,
     currency: cart.totalPrice.currencyCode,
-    totalPrice: cart.totalPrice,
+    totalPrice: normalisePrice(cart.totalPrice),
     totalLineItemQuantity: cart.totalLineItemQuantity,
     lineItems: cart?.lineItems
       .map((lineItem) => {
@@ -113,9 +117,10 @@ export function normaliseCart(
           productSlug: lineItem.productSlug,
           id: lineItem.id,
           name: lineItem.name,
-          sku: lineItem.variant?.sku,
+          variantSku: lineItem.variant?.sku,
           quantity: lineItem.quantity,
-          price: lineItem.totalPrice,
+          productPath: "/product/" + lineItem.productSlug,
+          price: normalisePrice(lineItem.totalPrice),
           image: {
             src: lineItem.variant?.images?.[0]?.url,
             label: lineItem.variant?.images?.[0]?.label || "",
@@ -141,5 +146,23 @@ export function normaliseCustomer(
     lastName: customer?.lastName ?? "MISSING_LAST_NAME",
     email: customer.email,
     isEmailVerified: customer.isEmailVerified,
+  };
+}
+
+export function normalisePrice(price: MoneyFragmentFragment) {
+  const formatter = new Intl.NumberFormat(LOCALE, {
+    style: "currency",
+    currency: price.currencyCode,
+    maximumFractionDigits: price.fractionDigits,
+  });
+
+  // Refer to https://docs.commercetools.com/api/types#usage
+  const amount = price.centAmount / 10 ** price.fractionDigits;
+
+  return {
+    amount,
+    centAmount: price.centAmount,
+    currencyCode: price.currencyCode,
+    formattedAmount: formatter.format(amount),
   };
 }
